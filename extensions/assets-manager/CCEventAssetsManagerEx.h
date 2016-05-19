@@ -53,7 +53,9 @@ public:
         ERROR_UPDATING,
         UPDATE_FINISHED,
         UPDATE_FAILED,
-        ERROR_DECOMPRESS
+        ERROR_DECOMPRESS,
+		FIX_VERSION_FOUND,
+		ERROR_MD5_CHECK_FAIL	
     };
     
     inline EventCode getEventCode() const { return _code; };

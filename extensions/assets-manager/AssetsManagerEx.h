@@ -63,7 +63,8 @@ public:
         NEED_UPDATE,
         UPDATING,
         UP_TO_DATE,
-        FAIL_TO_UPDATE
+        FAIL_TO_UPDATE,
+		NEED_PACKAGE_UPDATE
     };
     
     const static std::string VERSION_ID;
@@ -139,7 +140,7 @@ protected:
     void startUpdate();
     void updateSucceed();
     bool decompress(const std::string &filename);
-    void decompressDownloadedZip();
+    bool decompressDownloadedZip();
     
     /** @brief Update a list of assets under the current AssetsManagerEx context
      */

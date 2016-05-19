@@ -70,6 +70,11 @@ public:
         Asset asset;
         DiffType type;
     };
+
+	struct GroupVersionValue{
+		std::string name;
+		size_t  size;
+	};
     
     /** @brief Check whether the version informations have been fully loaded
      */
@@ -94,11 +99,15 @@ public:
     /** @brief Gets manifest version.
      */
     const std::string& getVersion() const;
-    
+
+	const std::string& getFixVersion() const;
+
+	const std::string getMd5ByFilePath(const std::string path) const;
+
     /** @brief Get the search paths list related to the Manifest.
      */
     std::vector<std::string> getSearchPaths() const;
-    
+
 protected:
     
     /** @brief Constructor for Manifest class
@@ -151,17 +160,17 @@ protected:
     void clear();
     
     /** @brief Gets all groups.
-     */
-    const std::vector<std::string>& getGroups() const;
+     
+    const std::vector<std::string>& getGroups() const;*/
     
     /** @brief Gets all groups version.
      */
-    const std::unordered_map<std::string, std::string>& getGroupVerions() const;
+	const std::unordered_map<std::string, Manifest::GroupVersionValue>& getGroupVerions() const;
     
     /** @brief Gets version for the given group.
      * @param group   Key of the requested group
      */
-    const std::string& getGroupVersion(const std::string &group) const;
+    const Manifest::GroupVersionValue& getGroupVersion(const std::string &group) const;
     
     /** @brief Gets assets.
      */
@@ -172,7 +181,11 @@ protected:
      * @param state The current download state of the asset
      */
     void setAssetDownloadState(const std::string &key, const DownloadState &state);
+
+	Manifest::GroupVersionValue parseGroupVersion(const std::string& key, const rapidjson::Value& json);
     
+	size_t getTotalSize(const Manifest& bManifest) const;
+
 private:
     
     //! Indicate whether the version informations have been fully loaded
@@ -198,12 +211,10 @@ private:
     
     //! The version of local manifest
     std::string _version;
-    
-    //! All groups exist in manifest [Optional]
-    std::vector<std::string> _groups;
-    
-    //! The versions of all local group [Optional]
-    std::unordered_map<std::string, std::string> _groupVer;
+	//! The fixVersion of local manifest
+	std::string _fixVersion;
+
+	std::unordered_map<std::string, Manifest::GroupVersionValue> _groupVersions;
     
     //! The version of local engine
     std::string _engineVer;

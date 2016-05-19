@@ -30,6 +30,9 @@
 #include <curl/easy.h>
 #include <stdio.h>
 
+#include "CMD5Checksum.h"
+#include "MD5ChecksumDefines.h"
+
 #ifdef MINIZIP_FROM_SYSTEM
 #include <minizip/unzip.h>
 #else // from our embedded sources
@@ -53,6 +56,8 @@ NS_CC_EXT_BEGIN
 const std::string AssetsManagerEx::VERSION_ID = "@version";
 const std::string AssetsManagerEx::MANIFEST_ID = "@manifest";
 const std::string AssetsManagerEx::BATCH_UPDATE_ID = "@batch_update";
+
+bool sortDownloadFiles(std::string&  file1, std::string&  file2);
 
 // Implementation of AssetsManagerEx
 
@@ -405,18 +410,32 @@ bool AssetsManagerEx::decompress(const std::string &zip)
     return true;
 }
 
-void AssetsManagerEx::decompressDownloadedZip()
+bool AssetsManagerEx::decompressDownloadedZip()
 {
+	std::sort(_compressedFiles.begin(), _compressedFiles.end(), sortDownloadFiles);
+
     // Decompress all compressed files
     for (auto it = _compressedFiles.begin(); it != _compressedFiles.end(); ++it) {
         std::string zipfile = *it;
-        if (!decompress(zipfile))
-        {
-            dispatchUpdateEvent(EventAssetsManagerEx::EventCode::ERROR_DECOMPRESS, "", "Unable to decompress file " + zipfile);
-        }
-        _fileUtils->removeFile(zipfile);
+
+		std::string remoteMd5 = _remoteManifest->getMd5ByFilePath(zipfile);
+		std::string clientMd5 = CMD5Checksum::md5file(zipfile.c_str());
+		if (strcmp(remoteMd5.c_str(),clientMd5.c_str()))
+		{
+			dispatchUpdateEvent(EventAssetsManagerEx::EventCode::ERROR_MD5_CHECK_FAIL,"","md5 check fail "+zipfile);
+			return false;
+		}
+		else{
+			if (!decompress(zipfile))
+			{
+				dispatchUpdateEvent(EventAssetsManagerEx::EventCode::ERROR_DECOMPRESS, "", "Unable to decompress file " + zipfile);
+				return false;
+			}
+		}
+		_fileUtils->removeFile(zipfile);
     }
     _compressedFiles.clear();
+	return true;
 }
 
 void AssetsManagerEx::dispatchUpdateEvent(EventAssetsManagerEx::EventCode code, const std::string &assetId/* = ""*/, const std::string &message/* = ""*/, int curle_code/* = CURLE_OK*/, int curlm_code/* = CURLM_OK*/)
@@ -467,7 +486,12 @@ void AssetsManagerEx::parseVersion()
     }
     else
     {
-        if (_localManifest->versionEquals(_remoteManifest))
+		if (strcmp(_localManifest->getFixVersion().c_str(),_remoteManifest->getFixVersion().c_str()))
+		{
+			_updateState = State::NEED_PACKAGE_UPDATE;
+			dispatchUpdateEvent(EventAssetsManagerEx::EventCode::FIX_VERSION_FOUND);
+		}
+		else if (_localManifest->versionEquals(_remoteManifest))
         {
             _updateState = State::UP_TO_DATE;
             dispatchUpdateEvent(EventAssetsManagerEx::EventCode::ALREADY_UP_TO_DATE);
@@ -475,7 +499,10 @@ void AssetsManagerEx::parseVersion()
         else
         {
             _updateState = State::NEED_UPDATE;
-            dispatchUpdateEvent(EventAssetsManagerEx::EventCode::NEW_VERSION_FOUND);
+			size_t totalSize = _remoteManifest->getTotalSize(*_localManifest);
+			std::string msg = StringUtils::format("%d", totalSize);
+
+            dispatchUpdateEvent(EventAssetsManagerEx::EventCode::NEW_VERSION_FOUND,"",msg);
 
             // Wait to update so continue the process
             if (_waitToUpdate)
@@ -634,20 +661,23 @@ void AssetsManagerEx::updateSucceed()
 {
     // Every thing is correctly downloaded, do the following
     // 1. rename temporary manifest to valid manifest
-    _fileUtils->renameFile(_storagePath, TEMP_MANIFEST_FILENAME, MANIFEST_FILENAME);
-    // 2. swap the localManifest
-    if (_localManifest != nullptr)
-        _localManifest->release();
-    _localManifest = _remoteManifest;
-    _remoteManifest = nullptr;
-    // 3. make local manifest take effect
-    prepareLocalManifest();
-    // 4. decompress all compressed files
-    decompressDownloadedZip();
-    // 5. Set update state
-    _updateState = State::UP_TO_DATE;
-    // 6. Notify finished event
-    dispatchUpdateEvent(EventAssetsManagerEx::EventCode::UPDATE_FINISHED);
+
+	// 4. decompress all compressed files
+	if (decompressDownloadedZip())
+	{
+		_fileUtils->renameFile(_storagePath, TEMP_MANIFEST_FILENAME, MANIFEST_FILENAME);
+		// 2. swap the localManifest
+		if (_localManifest != nullptr)
+			_localManifest->release();
+		_localManifest = _remoteManifest;
+		// 3. make local manifest take effect
+		prepareLocalManifest();
+
+		// 5. Set update state
+		_updateState = State::UP_TO_DATE;
+		// 6. Notify finished event
+		dispatchUpdateEvent(EventAssetsManagerEx::EventCode::UPDATE_FINISHED);
+	}
 }
 
 void AssetsManagerEx::checkUpdate()
@@ -746,6 +776,7 @@ void AssetsManagerEx::update()
             break;
         case State::UP_TO_DATE:
         case State::UPDATING:
+		case State::NEED_PACKAGE_UPDATE:
             _waitToUpdate = false;
             break;
         default:
@@ -940,6 +971,23 @@ void AssetsManagerEx::destroyDownloadedVersion()
 {
     _fileUtils->removeFile(_cacheVersionPath);
     _fileUtils->removeFile(_cacheManifestPath);
+}
+
+bool sortDownloadFiles(std::string& file1, std::string& file2)
+{
+	std::string name1 = "";
+	std::string name2 = ""; 
+	size_t posBegin = file1.rfind('/');
+	size_t posEnd = file1.find(".zip");
+	if (posBegin != std::string::npos && posEnd != std::string::npos)
+		name1 = file1.substr(posBegin + 1, posEnd - posBegin - 1);
+
+	posBegin = file2.rfind('/');
+	posEnd = file2.rfind(".zip");
+	if (posBegin != std::string::npos && posEnd != std::string::npos)
+		name2 = file2.substr(posBegin + 1, posEnd - posBegin - 1);
+
+	return strcmp(name1.c_str(), name2.c_str())<=0;
 }
 
 NS_CC_EXT_END

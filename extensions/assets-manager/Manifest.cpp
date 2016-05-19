@@ -46,6 +46,10 @@
 #define KEY_COMPRESSED_FILE     "compressedFile"
 #define KEY_DOWNLOAD_STATE      "downloadState"
 
+#define KEY_GROUP_NAME "name"
+#define KEY_GROUP_SIZE "size"
+#define KEY_FIX_VERSION "fixVersion"
+
 NS_CC_EXT_BEGIN
 
 Manifest::Manifest(const std::string& manifestUrl/* = ""*/)
@@ -56,6 +60,7 @@ Manifest::Manifest(const std::string& manifestUrl/* = ""*/)
 , _remoteVersionUrl("")
 , _version("")
 , _engineVer("")
+, _fixVersion("")
 {
     // Init variables
     _fileUtils = FileUtils::getInstance();
@@ -137,22 +142,24 @@ bool Manifest::versionEquals(const Manifest *b) const
     // Check group versions
     else
     {
-        std::vector<std::string> bGroups = b->getGroups();
-        std::unordered_map<std::string, std::string> bGroupVer = b->getGroupVerions();
-        // Check group size
-        if (bGroups.size() != _groups.size())
-            return false;
-        
-        // Check groups version
-        for (unsigned int i = 0; i < _groups.size(); ++i) {
-            std::string gid =_groups[i];
-            // Check group name
-            if (gid != bGroups[i])
-                return false;
-            // Check group version
-            if (_groupVer.at(gid) != bGroupVer.at(gid))
-                return false;
-        }
+		std::unordered_map<std::string, Manifest::GroupVersionValue> bGroupVersions = b->getGroupVerions();
+		if (bGroupVersions.size() != _groupVersions.size())
+			return false;
+
+		for (auto it = bGroupVersions.begin(); it != bGroupVersions.end();it++)
+		{
+			std::string key = it->first;
+			GroupVersionValue  versionValue = it->second; 
+			if (_groupVersions.find(key) == _groupVersions.end())
+			{
+				return false;
+			}
+			GroupVersionValue thisVerionValue = _groupVersions.find(key)->second;
+			if (strcmp(versionValue.name.c_str(),thisVerionValue.name.c_str())!=0 || versionValue.size != thisVerionValue.size)
+			{
+				return false;
+			}
+		}
     }
     return true;
 }
@@ -279,6 +286,11 @@ const std::string& Manifest::getManifestFileUrl() const
     return _remoteManifestUrl;
 }
 
+const std::string& Manifest::getFixVersion() const
+{
+	return _fixVersion;
+}
+
 const std::string& Manifest::getVersionFileUrl() const
 {
     return _remoteVersionUrl;
@@ -288,20 +300,21 @@ const std::string& Manifest::getVersion() const
 {
     return _version;
 }
-
+/*
 const std::vector<std::string>& Manifest::getGroups() const
 {
     return _groups;
 }
-
-const std::unordered_map<std::string, std::string>& Manifest::getGroupVerions() const
+*/
+const std::unordered_map<std::string, Manifest::GroupVersionValue>& Manifest::getGroupVerions() const
 {
-    return _groupVer;
+    return _groupVersions;
 }
 
-const std::string& Manifest::getGroupVersion(const std::string &group) const
+
+const Manifest::GroupVersionValue& Manifest::getGroupVersion(const std::string &group) const
 {
-    return _groupVer.at(group);
+	return _groupVersions.at(group);
 }
 
 const std::unordered_map<std::string, Manifest::Asset>& Manifest::getAssets() const
@@ -350,13 +363,13 @@ void Manifest::clear()
 {
     if (_versionLoaded || _loaded)
     {
-        _groups.clear();
-        _groupVer.clear();
+		_groupVersions.clear();
         
         _remoteManifestUrl = "";
         _remoteVersionUrl = "";
         _version = "";
         _engineVer = "";
+		_fixVersion = "";
         
         _versionLoaded = false;
     }
@@ -400,6 +413,28 @@ Manifest::Asset Manifest::parseAsset(const std::string &path, const rapidjson::V
     return asset;
 }
 
+Manifest::GroupVersionValue Manifest::parseGroupVersion(const std::string& key, const rapidjson::Value& json)
+{
+	Manifest::GroupVersionValue  newGroupVersion;
+	if (json.IsObject())
+	{
+
+		if (json.HasMember(KEY_GROUP_NAME) && json[KEY_GROUP_NAME].IsString())
+		{
+			newGroupVersion.name = json[KEY_GROUP_NAME].GetString();
+		}
+		else newGroupVersion.name = "";
+		
+		if (json.HasMember(KEY_GROUP_SIZE) && json[KEY_GROUP_SIZE].IsInt())
+		{
+			newGroupVersion.size = json[KEY_GROUP_SIZE].GetInt();
+		}
+		else newGroupVersion.size = 0;
+	}
+	
+	return newGroupVersion;
+}
+
 void Manifest::loadVersion(const rapidjson::Document &json)
 {
     // Retrieve remote manifest url
@@ -428,14 +463,9 @@ void Manifest::loadVersion(const rapidjson::Document &json)
         {
             for (rapidjson::Value::ConstMemberIterator itr = groupVers.MemberonBegin(); itr != groupVers.MemberonEnd(); ++itr)
             {
-                std::string group = itr->name.GetString();
-                std::string version = "0";
-                if (itr->value.IsString())
-                {
-                    version = itr->value.GetString();
-                }
-                _groups.push_back(group);
-                _groupVer.emplace(group, version);
+				std::string group = itr->name.GetString();
+				Manifest::GroupVersionValue newVersion = parseGroupVersion(group, itr->value);
+				_groupVersions.emplace(group, newVersion);
             }
         }
     }
@@ -445,6 +475,11 @@ void Manifest::loadVersion(const rapidjson::Document &json)
     {
         _engineVer = json[KEY_ENGINE_VERSION].GetString();
     }
+
+	if (json.HasMember(KEY_FIX_VERSION) && json[KEY_FIX_VERSION].IsString())
+	{
+		_fixVersion = json[KEY_FIX_VERSION].GetString();
+	}
     
     _versionLoaded = true;
 }
@@ -506,6 +541,49 @@ void Manifest::saveToFile(const std::string &filepath)
     std::ofstream output(filepath, std::ofstream::out);
     if(!output.bad())
         output << buffer.GetString() << std::endl;
+}
+
+size_t Manifest::getTotalSize(const Manifest& bManifest) const
+{
+	size_t  totalSize = 0;
+	std::unordered_map<std::string, Manifest::GroupVersionValue> bGroupVersions = bManifest.getGroupVerions();
+	if (bGroupVersions.size() >= _groupVersions.size())
+	{
+		return totalSize;
+	}
+
+	for (auto it = _groupVersions.begin(); it != _groupVersions.end();it++)
+	{
+		if (bGroupVersions.find(it->first) == bGroupVersions.end())
+		{
+			totalSize += it->second.size;
+		}
+	}
+	return totalSize;
+}
+
+const std::string Manifest::getMd5ByFilePath(const std::string path) const
+{
+	size_t  pos = path.rfind('/');
+	std::string filename = "";
+	if (pos!=std::string::npos)
+	{
+		filename = path.substr(pos + 1);
+	}
+	if (filename.length()<=0)
+	{
+		return "";
+	}
+
+	for (auto it = _assets.begin(); it != _assets.end();it++)
+	{
+		Manifest::Asset  tempAsset = it->second;
+		if (strcmp(filename.c_str(), tempAsset.path.c_str()) == 0)
+		{
+			return tempAsset.md5;
+		}
+	}
+	return "";
 }
 
 NS_CC_EXT_END
