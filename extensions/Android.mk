@@ -12,6 +12,7 @@ assets-manager/Manifest.cpp \
 assets-manager/AssetsManagerEx.cpp \
 assets-manager/CCEventAssetsManagerEx.cpp \
 assets-manager/CCEventListenerAssetsManagerEx.cpp \
+assets-manager/MD5ChecksumDefines.cpp \
 GUI/CCControlExtension/CCControl.cpp \
 GUI/CCControlExtension/CCControlButton.cpp \
 GUI/CCControlExtension/CCControlColourPicker.cpp \
