@@ -39,6 +39,13 @@
 #include "base/CCScheduler.h"
 
 #include "platform/CCFileUtils.h"
+#include "base/ccMacros.h"
+
+#include "json/document.h"
+#include "json/filestream.h"
+#include "json/prettywriter.h"
+#include "json/stringbuffer.h"
+
 
 NS_CC_BEGIN
 
@@ -98,10 +105,12 @@ static int processGetTask(HttpRequest *request, write_callback callback, void *s
 static int processPostTask(HttpRequest *request, write_callback callback, void *stream, long *errorCode, write_callback headerCallback, void *headerStream, char *errorBuffer);
 static int processPutTask(HttpRequest *request, write_callback callback, void *stream, long *errorCode, write_callback headerCallback, void *headerStream, char *errorBuffer);
 static int processDeleteTask(HttpRequest *request, write_callback callback, void *stream, long *errorCode, write_callback headerCallback, void *headerStream, char *errorBuffer);
+static int processUploadTask(HttpRequest *request, write_callback callback, void *stream, long *errorCode, write_callback headerCallback, void *headerStream, char *errorBuffer);
 // int processDownloadTask(HttpRequest *task, write_callback callback, void *stream, int32_t *errorCode);
 static void processResponse(HttpResponse* response, char* errorBuffer);
 
 static HttpRequest *s_requestSentinel = new HttpRequest;
+
 
 // Worker thread
 void HttpClient::networkThread()
@@ -354,6 +363,87 @@ static int processDeleteTask(HttpRequest *request, write_callback callback, void
 }
 
 
+#define KEY_FILES             "files"
+#define KEY_PARAMS		"params"
+
+//Process DELETE Request
+static int processUploadTask(HttpRequest *request, write_callback callback, void *stream, long *responseCode, write_callback headerCallback, void *headerStream, char *errorBuffer)
+{
+	CURLRaii curl;
+	bool ok = curl.init(request, callback, stream, headerCallback, headerStream, errorBuffer);
+
+	curl_httppost* m_formpost = NULL;
+	curl_httppost* m_lastpost = NULL;
+	char* buffer = request->getRequestData();
+	std::string  requestData(buffer,request->getRequestDataSize());
+
+	rapidjson::Document _json;
+	_json.Parse<0>(requestData.c_str());
+	if (_json.HasParseError()) {
+		size_t offset = _json.GetErrorOffset();
+		if (offset > 0)
+			offset--;
+		std::string errorSnippet = requestData.substr(offset, 10);
+		CCLOG("File parse error %s at <%s>\n", _json.GetParseError(), errorSnippet.c_str());
+		return 0;
+	}
+
+	CURLFORMcode curlCode;
+	std::string filePath;
+
+	if (_json.HasMember(KEY_PARAMS) && _json[KEY_PARAMS].IsObject())
+	{
+		const rapidjson::Value& groupVers = _json[KEY_PARAMS];
+		for (rapidjson::Value::ConstMemberIterator itr = groupVers.MemberonBegin(); itr != groupVers.MemberonEnd(); ++itr)
+		{
+			std::string key = itr->name.GetString();
+			std::string value = itr->value.GetString();
+
+			curlCode = curl_formadd(&m_formpost, &m_lastpost,
+				CURLFORM_COPYNAME, key.c_str(),
+				CURLFORM_COPYCONTENTS, value.c_str(),
+				CURLFORM_END);
+			ok &= curlCode == CURLFORMcode::CURL_FORMADD_OK;
+		}
+	}
+	else{
+		CCLOG("no params need upload");
+	}
+
+	if (_json.HasMember(KEY_FILES) && _json[KEY_FILES].IsString())
+	{
+		filePath = _json[KEY_FILES].GetString();
+		curlCode = curl_formadd(&m_formpost, &m_lastpost,
+			CURLFORM_COPYNAME, "filecontent",
+			CURLFORM_FILE, filePath.c_str(),
+			CURLFORM_CONTENTTYPE, "application/octet-stream",
+			CURLFORM_END);
+		ok &= curlCode == CURLFORMcode::CURL_FORMADD_OK;
+	}
+	else{
+		CCLOG("no file need upload");
+		return 0;
+	}
+	
+
+	ok  =ok && curl.setOption(CURLOPT_POST, 1);
+	if (m_formpost)
+	{
+		ok = ok && curl.setOption(CURLOPT_HTTPPOST, m_formpost);
+	}
+	
+	ok = ok &&  curl.perform(responseCode);
+
+	if (m_formpost)
+	{
+		curl_formfree(m_formpost);
+		m_formpost = NULL;
+	}
+
+	return ok ? 0 : 1;
+}
+
+
 // Process Response
 static void processResponse(HttpResponse* response, char* errorBuffer)
 {
@@ -403,7 +493,14 @@ static void processResponse(HttpResponse* response, char* errorBuffer)
             response->getResponseHeader(),
             errorBuffer);
         break;
-
+	case HttpRequest::Type::UPLOAD:
+		retValue = processUploadTask(request,
+			writeData,
+			response->getResponseData(),
+			&responseCode,
+			writeHeaderData,
+			response->getResponseHeader(),
+			errorBuffer);
     default:
         CCASSERT(true, "CCHttpClient: unkown request type, only GET and POSt are supported");
         break;
