@@ -514,7 +514,7 @@ public:
      */
     virtual std::string getDescription() const override;
 
-    Widget* clone();
+    virtual Widget* clone() override;
 
     virtual void onEnter() override;
     virtual void onExit() override;

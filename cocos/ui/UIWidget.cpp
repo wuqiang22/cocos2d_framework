@@ -1157,11 +1157,7 @@ void Widget::copyClonedWidgetChildren(Widget* model)
 
     for (auto& subWidget : modelChildren)
     {
-        Widget* child = dynamic_cast<Widget*>(subWidget);
-        if (child)
-        {
-            addChild(child->clone());
-        }
+		addChild(subWidget->clone());
     }
 }
     
