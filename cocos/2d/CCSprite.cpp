@@ -1058,4 +1058,35 @@ std::string Sprite::getDescription() const
     return StringUtils::format("<Sprite | Tag = %d, TextureID = %d>", _tag, texture_id );
 }
 
+Node* Sprite::createCloneInstance()
+{
+	return Sprite::create();
+}
+
+void Sprite::copyProperties(Node* node)
+{
+	Node::copyProperties(node);
+
+	Sprite* sprite = dynamic_cast<Sprite*>(node);
+	if (sprite)
+	{
+		setFlippedX(sprite->isFlippedX());
+		setFlippedY(sprite->isFlippedY());
+	}
+	
+}
+
+void Sprite::copySpecialProperties(Node* node)
+{
+	Sprite* sprite = dynamic_cast<Sprite*>(node);
+	if (sprite)
+	{
+		setTexture(sprite->getTexture());
+		if (sprite->getSpriteFrame())
+		{
+			setSpriteFrame(sprite->getSpriteFrame());
+		}
+	}
+}
+
 NS_CC_END

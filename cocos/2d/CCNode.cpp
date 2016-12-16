@@ -2275,6 +2275,59 @@ void Node::setCameraMask(unsigned short mask, bool applyChildren)
     }
 }
 
+Node* Node::clone()
+{
+	Node* cloneNode = createCloneInstance();
+	cloneNode->copyProperties(this);
+	cloneNode->copyClonedNodeChildren(this);
+	cloneNode->copySpecialProperties(this);
+	return cloneNode;
+}
+
+Node* Node::createCloneInstance()
+{
+	return Node::create();
+}
+
+void Node::copyProperties(Node* node)
+{
+	setRotationSkewX(node->getRotationSkewX());
+	setRotationSkewY(node->getRotationSkewY());
+	setRotation3D(node->getRotation3D());
+	setPosition(node->getPosition());
+	setScaleX(node->getScaleX());
+	setScaleY(node->getScaleY());
+	setScaleZ(node->getScaleZ());
+	setSkewX(node->getSkewX());
+	setSkewY(node->getSkewY());
+	setAnchorPoint(node->getAnchorPoint());
+	setContentSize(node->getContentSize());
+	setLocalZOrder(node->getLocalZOrder());
+	setParent(nullptr);
+	ignoreAnchorPointForPosition(node->isIgnoreAnchorPointForPosition());
+	setCascadeColorEnabled(node->isCascadeColorEnabled());
+	setCascadeOpacityEnabled(node->isCascadeOpacityEnabled());
+	setColor(node->getColor());
+}
+
+
+void Node::copyClonedNodeChildren(Node* node)
+{
+	auto& childrens = node->getChildren();
+	if (childrens.size()>0)
+	{
+		for (auto& child : childrens)
+		{
+			addChild(child->clone());
+		}
+	}
+}
+
+void Node::copySpecialProperties(Node* node)
+{
+
+}
+
 // MARK: Deprecated
 
 __NodeRGBA::__NodeRGBA()

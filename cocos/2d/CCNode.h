@@ -1577,12 +1577,22 @@ public:
     unsigned short getCameraMask() const { return _cameraMask; }
     void setCameraMask(unsigned short mask, bool applyChildren = true);
 
+
+	virtual Node* clone();
+	virtual Node* createCloneInstance();
+	virtual void copyProperties(Node* node);
+	virtual void copySpecialProperties(Node* node);
+	virtual void copyClonedNodeChildren(Node* node);
+
 CC_CONSTRUCTOR_ACCESS:
     // Nodes should be created using create();
     Node();
     virtual ~Node();
 
     virtual bool init();
+
+
+	
 
 protected:
     /// lazy allocs

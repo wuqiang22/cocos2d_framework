@@ -513,6 +513,11 @@ CC_CONSTRUCTOR_ACCESS:
      */
     virtual bool initWithFile(const std::string& filename, const Rect& rect);
 
+
+	virtual Node* createCloneInstance() override;
+	virtual void copyProperties(Node* node) override;
+	virtual void copySpecialProperties(Node* node) override;
+
 protected:
 
     void updateColor();
