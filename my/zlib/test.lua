@@ -20,4 +20,5 @@ local function testLuaZip()
 end
 
 如果被压缩的字符串比较少，bytes_in > bytes_out 
+在写入比较大的数据到本地可以考虑进行压缩
 
