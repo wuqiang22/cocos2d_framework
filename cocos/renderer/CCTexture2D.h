@@ -348,6 +348,11 @@ public:
     
     void setGLProgram(GLProgram* program);
     GLProgram* getGLProgram() const;
+
+	void releaseStringDatas();
+	inline void* getStringDatas(){ return _outStringBytes; };
+	inline int getStringDataLen(){ return _outStringLen; };
+	inline void setSaveStringDatas(bool save) { _saveStringDatas = save; };
     
 public:
     static const PixelFormatInfoMap& getPixelFormatInfoMap();
@@ -434,6 +439,10 @@ protected:
     static const PixelFormatInfoMap _pixelFormatInfoTables;
 
     bool _antialiasEnabled;
+
+	bool _saveStringDatas;
+	void* _outStringBytes;
+	int _outStringLen;
 };
 
 

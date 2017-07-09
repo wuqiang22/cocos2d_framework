@@ -435,6 +435,9 @@ Texture2D::Texture2D()
 , _hasMipmaps(false)
 , _shaderProgram(nullptr)
 , _antialiasEnabled(true)
+, _saveStringDatas(false)
+, _outStringBytes(nullptr)
+, _outStringLen(0)
 {
 }
 
@@ -451,6 +454,7 @@ Texture2D::~Texture2D()
     {
         GL::deleteTexture(_name);
     }
+	releaseStringDatas();
 }
 
 void Texture2D::releaseGLTexture()
@@ -1120,6 +1124,16 @@ bool Texture2D::initWithString(const char *text, const FontDefinition& textDefin
 
     ret = initWithData(outTempData, outTempDataLen, pixelFormat, imageWidth, imageHeight, imageSize);
 
+	if (_saveStringDatas)
+	{
+		int dataLen = sizeof(unsigned char) * outTempDataLen;
+		_outStringBytes = (unsigned char*)malloc(dataLen);
+		_outStringLen = dataLen;
+		if (_outStringBytes)
+		{
+			memcpy_s(_outStringBytes, dataLen, outTempData, dataLen);
+		}
+	}
     if (outTempData != nullptr && outTempData != outData.getBytes())
     {
         free(outTempData);
@@ -1129,6 +1143,16 @@ bool Texture2D::initWithString(const char *text, const FontDefinition& textDefin
     return ret;
 }
 
+void Texture2D::releaseStringDatas()
+{
+	if (_saveStringDatas)
+	{
+        if(_outStringBytes){
+            free(_outStringBytes);
+            _outStringBytes = nullptr;
+        }
+	}
+}
 
 // implementation Texture2D (Drawing)
 
