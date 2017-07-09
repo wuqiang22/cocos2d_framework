@@ -915,6 +915,7 @@ void Label::createSpriteWithFontDefinition()
     _currentLabelType = LabelType::STRING_TEXTURE;
 
     auto texture = new (std::nothrow) Texture2D;
+	texture->setSaveStringDatas(true);
     texture->initWithString(_originalUTF8String.c_str(),_fontDefinition);
 
     _textSprite = Sprite::createWithTexture(texture);
@@ -925,8 +926,8 @@ void Label::createSpriteWithFontDefinition()
     {
         _textSprite->setBlendFunc(_blendFunc);
     }
-
-    Node::addChild(_textSprite,0,Node::INVALID_TAG);
+//	Node::addChild(_textSprite, 0, 1000);
+    Node::addChild(_textSprite,0,Node::INVALID_TAG + 1000);
 
     _textSprite->updateDisplayedColor(_displayedColor);
     _textSprite->updateDisplayedOpacity(_displayedOpacity);
