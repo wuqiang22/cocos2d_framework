@@ -340,6 +340,42 @@ tolua_lerror:
 	return 0;
 }
 
+int lua_dynamictexture_createWithTexture(lua_State* tolua_S)
+{
+	int argc = 0;
+	bool ok = true;
+
+#if COCOS2D_DEBUG >= 1
+	tolua_Error tolua_err;
+#endif
+
+#if COCOS2D_DEBUG >= 1
+	if (!tolua_isusertable(tolua_S, 1, "cc.DynamicTexture", 0, &tolua_err)) goto tolua_lerror;
+#endif
+
+	argc = lua_gettop(tolua_S) - 1;
+
+	if (argc == 1){
+		cocos2d::Texture2D* arg0;
+		ok &= luaval_to_object<cocos2d::Texture2D>(tolua_S, 2, "cc.Texture2D", &arg0);
+		if (!ok)
+		{
+			tolua_error(tolua_S, "invalid arguments in function 'lua_dynamictexture_createWithTexture'", nullptr);
+			return 0;
+		}
+
+		cocos2d::Texture2D* ret = cocos2d::DynamicTexture::createWithTexture(arg0);
+		object_to_luaval<cocos2d::Texture2D>(tolua_S, "cc.Texture2D", (cocos2d::Texture2D*)ret);
+		return 1;
+	}
+	luaL_error(tolua_S, "%s has wrong number of arguments: %d, was expecting %d\n ", "cc.DynamicTexture:createWithTexture", argc, 0);
+	return 0;
+#if COCOS2D_DEBUG >= 1
+tolua_lerror:
+	tolua_error(tolua_S, "#ferror in function 'lua_dynamictexture_createWithTexture'.", &tolua_err);
+#endif
+	return 0;
+}
 
 
 int lua_register_DynamicTexture(lua_State* tolua_S)
@@ -349,6 +385,7 @@ int lua_register_DynamicTexture(lua_State* tolua_S)
 
 	tolua_beginmodule(tolua_S, "DynamicTexture");
 	tolua_function(tolua_S, "create", lua_dynamictexture_create);
+	tolua_function(tolua_S, "createWithTexture", lua_dynamictexture_createWithTexture);
 	tolua_function(tolua_S, "addStringTexture", lua_dynamictexture_addStringTexture);
 	tolua_function(tolua_S, "getSubTextureInfo", lua_dynamictexture_getSubTextureInfo);
 	tolua_function(tolua_S, "getTexture", lua_dynamictexture_getTexture);

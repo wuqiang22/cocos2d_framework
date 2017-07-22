@@ -16,8 +16,10 @@ public:
 	static const int DEFAULT_TEXTURE_WIDTH = 512;
 	static const int DEFAULT_TEXTURE_HEIGHT = 512;
 
+	static Texture2D* createWithTexture(Texture2D* texture);
 	static DynamicTexture* create();
 	static DynamicTexture* create(int width, int height);
+	static bool hasPremultipliedAlphaForTextureOfText();
 
 	//Ìí¼Ó×Ö·û´®ÎÆÀí
 	bool addStringTexture(Texture2D* texture, std::string key,bool wait = false);
