@@ -181,7 +181,7 @@ function DynamicTextureManager:getSprite(textureInfo)
 	return ret,pageIndex;
 end
 
-function DynamicTextureUpdateManager:hasDynamicTexture(key)
+function DynamicTextureManager:hasDynamicTexture(key)
 	return self.mapDynamicKey2TextreInfo[key]
 end
 
