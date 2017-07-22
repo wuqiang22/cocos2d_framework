@@ -189,6 +189,7 @@ public:
     CC_DEPRECATED_ATTRIBUTE static void PVRImagesHavePremultipliedAlpha(bool haveAlphaPremultiplied);
     
 public:
+	static Texture2D* create();
     /**
      * @js ctor
      */
@@ -320,6 +321,7 @@ public:
     const Size& getContentSizeInPixels();
 
     bool hasPremultipliedAlpha() const;
+	void setHasPremultipliedAlpha(bool value);
     bool hasMipmaps() const;
 
     /** Gets the pixel format of the texture */
@@ -352,7 +354,10 @@ public:
 	void releaseStringDatas();
 	inline void* getStringDatas(){ return _outStringBytes; };
 	inline int getStringDataLen(){ return _outStringLen; };
-	inline void setSaveStringDatas(bool save) { _saveStringDatas = save; };
+
+	bool isSaveStringTextureData(){ return _saveStringDatas; };
+	bool createPixelsWithString(const char *text, const std::string &fontName, float fontSize, const Size& dimensions = Size(0, 0), TextHAlignment hAlignment = TextHAlignment::CENTER, TextVAlignment vAlignment = TextVAlignment::TOP);
+	bool createPixelsWithString(const char *text, const FontDefinition& textDefinition);
     
 public:
     static const PixelFormatInfoMap& getPixelFormatInfoMap();

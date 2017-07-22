@@ -421,6 +421,19 @@ void Texture2D::convertRGBA8888ToRGB5A1(const unsigned char* data, ssize_t dataL
             |  (data[i + 3] & 0x0080) >> 7;   //A
     }
 }
+
+Texture2D* Texture2D::create()
+{
+	Texture2D *texture2d = new (std::nothrow) Texture2D();
+	if (texture2d)
+	{
+		texture2d->autorelease();
+		return texture2d;
+	}
+	CC_SAFE_DELETE(texture2d);
+	return nullptr;
+}
+
 // conventer function end
 //////////////////////////////////////////////////////////////////////////
 
@@ -536,6 +549,11 @@ void Texture2D::setGLProgram(GLProgram* shaderProgram)
 bool Texture2D::hasPremultipliedAlpha() const
 {
     return _hasPremultipliedAlpha;
+}
+
+void Texture2D::setHasPremultipliedAlpha(bool value)
+{
+	_hasPremultipliedAlpha = value;
 }
 
 bool Texture2D::initWithData(const void *data, ssize_t dataLen, Texture2D::PixelFormat pixelFormat, int pixelsWide, int pixelsHigh, const Size& contentSize)
@@ -1058,6 +1076,7 @@ bool Texture2D::initWithString(const char *text, const std::string& fontName, fl
     return initWithString(text, tempDef);
 }
 
+
 bool Texture2D::initWithString(const char *text, const FontDefinition& textDefinition)
 {
     if(!text || 0 == strlen(text))
@@ -1121,19 +1140,8 @@ bool Texture2D::initWithString(const char *text, const FontDefinition& textDefin
 
     Size  imageSize = Size((float)imageWidth, (float)imageHeight);
     pixelFormat = convertDataToFormat(outData.getBytes(), imageWidth*imageHeight*4, PixelFormat::RGBA8888, pixelFormat, &outTempData, &outTempDataLen);
+	ret = initWithData(outTempData, outTempDataLen, pixelFormat, imageWidth, imageHeight, imageSize);
 
-    ret = initWithData(outTempData, outTempDataLen, pixelFormat, imageWidth, imageHeight, imageSize);
-
-	if (_saveStringDatas)
-	{
-		int dataLen = sizeof(unsigned char) * outTempDataLen;
-		_outStringBytes = (unsigned char*)malloc(dataLen);
-		_outStringLen = dataLen;
-		if (_outStringBytes)
-		{
-			memcpy_s(_outStringBytes, dataLen, outTempData, dataLen);
-		}
-	}
     if (outTempData != nullptr && outTempData != outData.getBytes())
     {
         free(outTempData);
@@ -1152,6 +1160,113 @@ void Texture2D::releaseStringDatas()
             _outStringBytes = nullptr;
         }
 	}
+}
+
+bool Texture2D::createPixelsWithString(const char *text, const std::string& fontName, float fontSize, const Size& dimensions/* = Size(0, 0)*/, TextHAlignment hAlignment/* =  TextHAlignment::CENTER */, TextVAlignment vAlignment/* =  TextVAlignment::TOP */)
+{
+	FontDefinition tempDef;
+
+	tempDef._shadow._shadowEnabled = false;
+	tempDef._stroke._strokeEnabled = false;
+
+
+	tempDef._fontName = fontName;
+	tempDef._fontSize = fontSize;
+	tempDef._dimensions = dimensions;
+	tempDef._alignment = hAlignment;
+	tempDef._vertAlignment = vAlignment;
+	tempDef._fontFillColor = Color3B::WHITE;
+
+	_saveStringDatas = true;
+	return createPixelsWithString(text, tempDef);
+}
+
+bool Texture2D::createPixelsWithString(const char *text, const cocos2d::FontDefinition &textDefinition)
+{
+	if (!text || 0 == strlen(text))
+	{
+		return false;
+	}
+
+#if CC_ENABLE_CACHE_TEXTURE_DATA
+	// cache the texture data
+	VolatileTextureMgr::addStringTexture(this, text, textDefinition);
+#endif
+
+	Device::TextAlign align;
+
+	if (TextVAlignment::TOP == textDefinition._vertAlignment)
+	{
+		align = (TextHAlignment::CENTER == textDefinition._alignment) ? Device::TextAlign::TOP
+			: (TextHAlignment::LEFT == textDefinition._alignment) ? Device::TextAlign::TOP_LEFT : Device::TextAlign::TOP_RIGHT;
+	}
+	else if (TextVAlignment::CENTER == textDefinition._vertAlignment)
+	{
+		align = (TextHAlignment::CENTER == textDefinition._alignment) ? Device::TextAlign::CENTER
+			: (TextHAlignment::LEFT == textDefinition._alignment) ? Device::TextAlign::LEFT : Device::TextAlign::RIGHT;
+	}
+	else if (TextVAlignment::BOTTOM == textDefinition._vertAlignment)
+	{
+		align = (TextHAlignment::CENTER == textDefinition._alignment) ? Device::TextAlign::BOTTOM
+			: (TextHAlignment::LEFT == textDefinition._alignment) ? Device::TextAlign::BOTTOM_LEFT : Device::TextAlign::BOTTOM_RIGHT;
+	}
+	else
+	{
+		CCASSERT(false, "Not supported alignment format!");
+		return false;
+	}
+
+#if (CC_TARGET_PLATFORM != CC_PLATFORM_ANDROID) && (CC_TARGET_PLATFORM != CC_PLATFORM_IOS)
+	CCASSERT(textDefinition._stroke._strokeEnabled == false, "Currently stroke only supported on iOS and Android!");
+#endif
+
+	PixelFormat      pixelFormat = g_defaultAlphaPixelFormat;
+	unsigned char* outTempData = nullptr;
+	ssize_t outTempDataLen = 0;
+
+	int imageWidth;
+	int imageHeight;
+	auto textDef = textDefinition;
+	auto contentScaleFactor = CC_CONTENT_SCALE_FACTOR();
+	textDef._fontSize *= contentScaleFactor;
+	textDef._dimensions.width *= contentScaleFactor;
+	textDef._dimensions.height *= contentScaleFactor;
+	textDef._stroke._strokeSize *= contentScaleFactor;
+	textDef._shadow._shadowEnabled = false;
+
+	bool hasPremultipliedAlpha;
+	Data outData = Device::getTextureDataForText(text, textDef, align, imageWidth, imageHeight, hasPremultipliedAlpha);
+	if (outData.isNull())
+	{
+		return false;
+	}
+
+	Size  imageSize = Size((float)imageWidth, (float)imageHeight);
+	pixelFormat = convertDataToFormat(outData.getBytes(), imageWidth*imageHeight * 4, PixelFormat::RGBA8888, pixelFormat, &outTempData, &outTempDataLen);
+	initWithData(outTempData, outTempDataLen, pixelFormat, imageWidth, imageHeight, imageSize);
+
+	size_t dataLen = sizeof(unsigned char) * outTempDataLen;
+	_outStringBytes = (unsigned char*)malloc(dataLen);
+	_outStringLen = dataLen;
+	if (_outStringBytes)
+	{
+		memcpy(_outStringBytes, outTempData, dataLen);
+		//memcpy_s(_outStringBytes, dataLen, outTempData, dataLen);
+	}
+
+	if (outTempData != nullptr && outTempData != outData.getBytes())
+	{
+		free(outTempData);
+	}
+	_hasPremultipliedAlpha = hasPremultipliedAlpha;
+
+	_contentSize = Size((float)imageWidth, (float)imageHeight);
+	_pixelsWide = imageWidth;
+	_pixelsHigh = imageHeight;
+	_pixelFormat = pixelFormat;
+
+	return true;
+
 }
 
 // implementation Texture2D (Drawing)
