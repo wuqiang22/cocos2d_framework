@@ -58,6 +58,7 @@ public:
 protected:
     ClippingRectangleNode()
     : _clippingEnabled(true)
+    ,_currentScissorEnabled(false)
     {
     }
     
@@ -66,6 +67,8 @@ protected:
     
     Rect _clippingRegion;
     bool _clippingEnabled;
+     GLboolean _currentScissorEnabled;
+    GLint scissorRect[4];
     
     CustomCommand _beforeVisitCmdScissor;
     CustomCommand _afterVisitCmdScissor;
@@ -74,4 +77,3 @@ protected:
 NS_CC_END
 
 #endif
-

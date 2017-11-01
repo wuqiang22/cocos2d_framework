@@ -40,6 +40,9 @@ void ClippingRectangleNode::setClippingRegion(const Rect &clippingRegion)
 void ClippingRectangleNode::onBeforeVisitScissor()
 {
     if (_clippingEnabled) {
+        _currentScissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        glGetIntegerv(GL_SCISSOR_BOX, scissorRect);
+
         glEnable(GL_SCISSOR_TEST);
         
         float scaleX = _scaleX;
@@ -65,6 +68,16 @@ void ClippingRectangleNode::onAfterVisitScissor()
     if (_clippingEnabled)
     {
         glDisable(GL_SCISSOR_TEST);
+        if(_currentScissorEnabled){
+            glEnable(GL_SCISSOR_TEST);
+            _currentScissorEnabled = false;
+            GLView* glView = Director::getInstance()->getOpenGLView();
+            glView->setScissorInPoints(scissorRect[0],
+                                       scissorRect[1],
+                                       scissorRect[2],
+                                       scissorRect[3]);
+        }
+
     }
 }
 
